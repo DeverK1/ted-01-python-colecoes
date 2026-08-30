@@ -360,6 +360,161 @@ def comparar_vendedores(produtos_por_vendedor, vendedor_a, vendedor_b):
     }
 
 
+def consulta_1_faturamento(registros_tratados):
+    """
+    CONSULTA 1 — Faturamento total e faturamento individual por vendedor.
+
+    Parâmetros:
+        registros_tratados (list[dict]): saída de modelar_registros()
+
+    Retorna:
+        dict com:
+            "faturamento_total" (float)
+            "faturamento_por_vendedor" (dict[str, float]), ordenado do
+                maior para o menor faturamento
+    """
+    faturamento_total = sum(venda["valor_total"] for venda in registros_tratados)
+
+    faturamento_por_vendedor = {}
+    for venda in registros_tratados:
+        vendedor = venda["vendedor"]
+        faturamento_por_vendedor[vendedor] = (
+            faturamento_por_vendedor.get(vendedor, 0.0) + venda["valor_total"]
+        )
+
+    # Ordena do maior para o menor faturamento (facilita o ranking)
+    faturamento_por_vendedor = dict(
+        sorted(faturamento_por_vendedor.items(), key=lambda par: par[1], reverse=True)
+    )
+
+    return {
+        "faturamento_total": faturamento_total,
+        "faturamento_por_vendedor": faturamento_por_vendedor,
+    }
+
+
+def consulta_2_maior_volume(registros_tratados):
+    """
+    CONSULTA 2 — Produto e categoria com maior volume de vendas.
+
+    "Volume de vendas" aqui é a soma da quantidade vendida (não o
+    valor em reais) — ou seja, quantas unidades saíram, não quanto
+    dinheiro entrou.
+
+    Parâmetros:
+        registros_tratados (list[dict]): saída de modelar_registros()
+
+    Retorna:
+        dict com:
+            "volume_por_produto" (dict[str, int]), ordenado do maior
+                para o menor volume
+            "volume_por_categoria" (dict[str, int]), ordenado do
+                maior para o menor volume
+            "produto_top" (tuple[str, int]): (nome, quantidade) do
+                produto mais vendido
+            "categoria_top" (tuple[str, int]): (nome, quantidade) da
+                categoria mais vendida
+    """
+    volume_por_produto = {}
+    volume_por_categoria = {}
+
+    for venda in registros_tratados:
+        produto = venda["produto"]
+        categoria = venda["categoria"]
+        volume_por_produto[produto] = (
+            volume_por_produto.get(produto, 0) + venda["quantidade"]
+        )
+        volume_por_categoria[categoria] = (
+            volume_por_categoria.get(categoria, 0) + venda["quantidade"]
+        )
+
+    volume_por_produto = dict(
+        sorted(volume_por_produto.items(), key=lambda par: par[1], reverse=True)
+    )
+    volume_por_categoria = dict(
+        sorted(volume_por_categoria.items(), key=lambda par: par[1], reverse=True)
+    )
+
+    produto_top = next(iter(volume_por_produto.items()))
+    categoria_top = next(iter(volume_por_categoria.items()))
+
+    return {
+        "volume_por_produto": volume_por_produto,
+        "volume_por_categoria": volume_por_categoria,
+        "produto_top": produto_top,
+        "categoria_top": categoria_top,
+    }
+
+
+def consulta_3_comparar_portfolio(registros_tratados, vendedor_a, vendedor_b):
+    """
+    CONSULTA 3 — Comparação de portfólio de produtos entre dois
+    vendedores via set (união, interseção e diferença).
+
+    Reaproveita agrupar_produtos_por_vendedor() e comparar_vendedores(),
+    já construídas no tópico de operações de conjuntos.
+
+    Parâmetros:
+        registros_tratados (list[dict]): saída de modelar_registros()
+        vendedor_a, vendedor_b (str): nomes dos vendedores a comparar
+
+    Retorna:
+        dict com as chaves "uniao", "intersecao", "diferenca_a_b" e
+        "diferenca_b_a" (mesmo formato de comparar_vendedores())
+    """
+    produtos_por_vendedor = agrupar_produtos_por_vendedor(registros_tratados)
+    return comparar_vendedores(produtos_por_vendedor, vendedor_a, vendedor_b)
+
+
+def exibir_consulta_1(resultado):
+    """Exibe o faturamento total e por vendedor."""
+    fmt.secao("Consulta 1 — Faturamento total e por vendedor")
+    fmt.item("Faturamento total", fmt.moeda(resultado["faturamento_total"]), destaque=True)
+    print()
+    larguras = [20, 16]
+    fmt.linha_tabela(["Vendedor", "Faturamento"], larguras)
+    for vendedor, valor in resultado["faturamento_por_vendedor"].items():
+        fmt.linha_tabela([vendedor, fmt.moeda(valor)], larguras)
+
+
+def exibir_consulta_2(resultado):
+    """Exibe o ranking de volume de vendas por produto e por categoria."""
+    fmt.secao("Consulta 2 — Maior volume de vendas (produtos e categorias)")
+
+    produto_nome, produto_qtd = resultado["produto_top"]
+    categoria_nome, categoria_qtd = resultado["categoria_top"]
+    fmt.item("Produto mais vendido", f"{produto_nome} ({produto_qtd} un.)", destaque=True)
+    fmt.item(
+        "Categoria mais vendida", f"{categoria_nome} ({categoria_qtd} un.)", destaque=True
+    )
+
+    print()
+    larguras = [20, 16]
+    fmt.rotulo("Ranking por produto (unidades vendidas)")
+    fmt.linha_tabela(["Produto", "Unidades"], larguras)
+    for produto, qtd in resultado["volume_por_produto"].items():
+        fmt.linha_tabela([produto, qtd], larguras)
+
+    print()
+    fmt.rotulo("Ranking por categoria (unidades vendidas)")
+    fmt.linha_tabela(["Categoria", "Unidades"], larguras)
+    for categoria, qtd in resultado["volume_por_categoria"].items():
+        fmt.linha_tabela([categoria, qtd], larguras)
+
+
+def exibir_consulta_3(vendedor_a, vendedor_b, resultado):
+    """Exibe a comparação de portfólio entre dois vendedores (consulta 3)."""
+    fmt.secao(f"Consulta 3 — Portfólio de produtos: {vendedor_a} × {vendedor_b}")
+    fmt.rotulo("União (A | B) — todos os produtos vendidos por algum dos dois")
+    fmt.lista_valores(sorted(resultado["uniao"]))
+    fmt.rotulo("Interseção (A & B) — produtos que ambos venderam")
+    fmt.lista_valores(sorted(resultado["intersecao"]))
+    fmt.rotulo(f"Diferença — só {vendedor_a} vendeu")
+    fmt.lista_valores(sorted(resultado["diferenca_a_b"]))
+    fmt.rotulo(f"Diferença — só {vendedor_b} vendeu")
+    fmt.lista_valores(sorted(resultado["diferenca_b_a"]))
+
+
 def exibir_comparacao(vendedor_a, vendedor_b, resultado):
     """Exibe de forma legível o resultado de comparar_vendedores()."""
     fmt.secao(f"Operações de conjunto: {vendedor_a} × {vendedor_b}")
@@ -470,6 +625,13 @@ def funcao_2_processar_analises(dados_carregados, limite_valor_alto=1000.0):
     descricoes_vendas = gerar_descricoes_vendas(registros_tratados)
     mapa_valor_por_venda = mapear_valor_por_venda(registros_tratados)
 
+    # As 3 consultas/análises do cenário
+    resultado_consulta_1 = consulta_1_faturamento(registros_tratados)
+    resultado_consulta_2 = consulta_2_maior_volume(registros_tratados)
+    resultado_consulta_3 = consulta_3_comparar_portfolio(
+        registros_tratados, vendedor_a, vendedor_b
+    )
+
     return {
         "total_lido": dados_carregados["total_lido"],
         "qtd_duplicados": dados_carregados["qtd_duplicados"],
@@ -484,6 +646,9 @@ def funcao_2_processar_analises(dados_carregados, limite_valor_alto=1000.0):
         "vendas_altas": vendas_altas,
         "descricoes_vendas": descricoes_vendas,
         "mapa_valor_por_venda": mapa_valor_por_venda,
+        "resultado_consulta_1": resultado_consulta_1,
+        "resultado_consulta_2": resultado_consulta_2,
+        "resultado_consulta_3": resultado_consulta_3,
     }
 
 
@@ -522,6 +687,12 @@ def funcao_3_exibir_relatorio(analises):
         analises["descricoes_vendas"],
         analises["mapa_valor_por_venda"],
         analises["limite_valor_alto"],
+    )
+
+    exibir_consulta_1(analises["resultado_consulta_1"])
+    exibir_consulta_2(analises["resultado_consulta_2"])
+    exibir_consulta_3(
+        analises["vendedor_a"], analises["vendedor_b"], analises["resultado_consulta_3"]
     )
 
     fmt.rodape("Processamento concluído")
