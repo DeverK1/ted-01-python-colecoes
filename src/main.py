@@ -373,12 +373,10 @@ def exibir_comparacao(vendedor_a, vendedor_b, resultado):
     fmt.lista_valores(sorted(resultado["diferenca_b_a"]))
 
 
-def exibir_resumo(dados, qtd_duplicados, total_final):
+def exibir_resumo(total_lido, qtd_duplicados, total_final, conjuntos):
     """Exibe o resumo da leitura e limpeza da base."""
-    conjuntos = dados["conjuntos"]
-
     fmt.secao("Leitura e limpeza da base")
-    fmt.item("Registros lidos", len(dados["registros"]))
+    fmt.item("Registros lidos", total_lido)
     fmt.item("Duplicados removidos", qtd_duplicados)
     fmt.item("Total após remoção", total_final, destaque=True)
 
@@ -395,34 +393,141 @@ def exibir_resumo(dados, qtd_duplicados, total_final):
         fmt.lista_valores(sorted(conjunto))
 
 
-if __name__ == "__main__":
-    fmt.titulo("Análise de Vendas — Tratamento e Modelagem de Dados")
+def funcao_1_carregar_e_limpar_dados(caminho_arquivo=CAMINHO_PADRAO):
+    """
+    ETAPA 1 — Carga e limpeza dos dados.
 
-    dados = ler_dados_vendas()
+    Lê o arquivo CSV, remove os registros duplicados e faz o parse
+    inicial (conversão de tipos: quantidade -> int, valor -> float,
+    cálculo de valor_total). É a única função que toca o arquivo
+    em disco; todas as etapas seguintes trabalham só com os dados
+    já em memória.
 
-    registros_sem_duplicados = remover_duplicados(dados["registros"])
-    qtd_duplicados = len(dados["registros"]) - len(registros_sem_duplicados)
+    Parâmetros:
+        caminho_arquivo (str): caminho para o vendas.csv
 
-    exibir_resumo(dados, qtd_duplicados, len(registros_sem_duplicados))
-
-    # Operações de conjuntos: comparando produtos entre dois vendedores
-    produtos_por_vendedor = agrupar_produtos_por_vendedor(registros_sem_duplicados)
-    resultado = comparar_vendedores(produtos_por_vendedor, "Beatriz", "Carlos")
-    exibir_comparacao("Beatriz", "Carlos", resultado)
-
-    # Modelagem dos dados com coleções avançadas (list, tuple, dict)
+    Retorna:
+        dict com:
+            "registros_tratados" (list[dict]): dados limpos e tipados
+            "total_lido" (int): quantidade de linhas lidas do CSV
+            "qtd_duplicados" (int): quantas linhas duplicadas foram
+                removidas
+    """
+    dados_brutos = ler_dados_vendas(caminho_arquivo)
+    registros_sem_duplicados = remover_duplicados(dados_brutos["registros"])
+    qtd_duplicados = len(dados_brutos["registros"]) - len(registros_sem_duplicados)
     registros_tratados = modelar_registros(registros_sem_duplicados)
+
+    return {
+        "registros_tratados": registros_tratados,
+        "total_lido": len(dados_brutos["registros"]),
+        "qtd_duplicados": qtd_duplicados,
+    }
+
+
+def funcao_2_processar_analises(dados_carregados, limite_valor_alto=1000.0):
+    """
+    ETAPA 2 — Processamento das análises.
+
+    Recebe a saída de funcao_1_carregar_e_limpar_dados() e aplica
+    todas as operações de análise: conjuntos (valores únicos, união,
+    interseção, diferença), coleções aninhadas (tuplas, agrupamento
+    por categoria) e comprehensions (filtragem, transformação e
+    mapeamento). Não imprime nada — só calcula e retorna os dados.
+
+    Parâmetros:
+        dados_carregados (dict): saída de funcao_1_carregar_e_limpar_dados()
+        limite_valor_alto (float): limite usado para filtrar as
+            "vendas de alto valor" na list comprehension
+
+    Retorna:
+        dict com todos os resultados das análises, pronto para ser
+        passado para funcao_3_exibir_relatorio()
+    """
+    registros_tratados = dados_carregados["registros_tratados"]
+
+    # Conjuntos (set): valores únicos por coluna categórica
+    conjuntos = {
+        "vendedores": {r["vendedor"] for r in registros_tratados},
+        "produtos": {r["produto"] for r in registros_tratados},
+        "categorias": {r["categoria"] for r in registros_tratados},
+        "formas_pagamento": {r["pagamento"] for r in registros_tratados},
+    }
+
+    # Operações de conjunto: comparando produtos entre dois vendedores
+    vendedor_a, vendedor_b = "Beatriz", "Carlos"
+    produtos_por_vendedor = agrupar_produtos_por_vendedor(registros_tratados)
+    comparacao_vendedores = comparar_vendedores(
+        produtos_por_vendedor, vendedor_a, vendedor_b
+    )
+
+    # Coleções avançadas: list[tuple] e dict[str, list[dict]]
     tuplas_id_valor = montar_tuplas_id_valor(registros_tratados)
     por_categoria = agrupar_por_categoria(registros_tratados)
-    exibir_modelagem(registros_tratados, tuplas_id_valor, por_categoria)
 
     # Comprehensions: 2 list comprehensions + 1 dict comprehension
-    limite_valor_alto = 1000.0
     vendas_altas = filtrar_vendas_altas(registros_tratados, limite_valor_alto)
     descricoes_vendas = gerar_descricoes_vendas(registros_tratados)
     mapa_valor_por_venda = mapear_valor_por_venda(registros_tratados)
+
+    return {
+        "total_lido": dados_carregados["total_lido"],
+        "qtd_duplicados": dados_carregados["qtd_duplicados"],
+        "registros_tratados": registros_tratados,
+        "conjuntos": conjuntos,
+        "vendedor_a": vendedor_a,
+        "vendedor_b": vendedor_b,
+        "comparacao_vendedores": comparacao_vendedores,
+        "tuplas_id_valor": tuplas_id_valor,
+        "por_categoria": por_categoria,
+        "limite_valor_alto": limite_valor_alto,
+        "vendas_altas": vendas_altas,
+        "descricoes_vendas": descricoes_vendas,
+        "mapa_valor_por_venda": mapa_valor_por_venda,
+    }
+
+
+def funcao_3_exibir_relatorio(analises):
+    """
+    ETAPA 3 — Exibição do relatório.
+
+    Recebe a saída de funcao_2_processar_analises() e imprime tudo
+    formatado no terminal, usando o módulo formatacao. É a única
+    função que faz print() — todas as etapas anteriores só calculam.
+
+    Parâmetros:
+        analises (dict): saída de funcao_2_processar_analises()
+    """
+    fmt.titulo("Análise de Vendas — Relatório Completo")
+
+    exibir_resumo(
+        analises["total_lido"],
+        analises["qtd_duplicados"],
+        len(analises["registros_tratados"]),
+        analises["conjuntos"],
+    )
+
+    exibir_comparacao(
+        analises["vendedor_a"], analises["vendedor_b"], analises["comparacao_vendedores"]
+    )
+
+    exibir_modelagem(
+        analises["registros_tratados"],
+        analises["tuplas_id_valor"],
+        analises["por_categoria"],
+    )
+
     exibir_comprehensions(
-        vendas_altas, descricoes_vendas, mapa_valor_por_venda, limite_valor_alto
+        analises["vendas_altas"],
+        analises["descricoes_vendas"],
+        analises["mapa_valor_por_venda"],
+        analises["limite_valor_alto"],
     )
 
     fmt.rodape("Processamento concluído")
+
+
+if __name__ == "__main__":
+    dados_carregados = funcao_1_carregar_e_limpar_dados()
+    analises = funcao_2_processar_analises(dados_carregados)
+    funcao_3_exibir_relatorio(analises)
