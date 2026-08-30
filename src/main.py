@@ -1,6 +1,8 @@
 import csv
 import os
 
+import formatacao as fmt
+
 # Diretório onde este script (.py) está salvo
 DIR_SCRIPT = os.path.dirname(os.path.abspath(__file__))
 # Sobe um nível (sai de src/) e entra em dados/
@@ -182,20 +184,35 @@ def agrupar_por_categoria(registros_tratados):
 
 def exibir_modelagem(registros_tratados, tuplas_id_valor, por_categoria):
     """Exibe uma amostra das estruturas montadas, para conferência."""
-    print("Amostra de registros tratados (list[dict]):")
+    fmt.secao("Amostra de registros tratados (list[dict])")
+    larguras = [7, 10, 10, 13, 14]
+    fmt.linha_tabela(
+        ["ID", "Vendedor", "Produto", "Categoria", "Valor total"], larguras
+    )
     for registro in registros_tratados[:3]:
-        print(registro)
-    print()
+        fmt.linha_tabela(
+            [
+                registro["id_venda"],
+                registro["vendedor"],
+                registro["produto"],
+                registro["categoria"],
+                fmt.moeda(registro["valor_total"]),
+            ],
+            larguras,
+        )
 
-    print("Amostra de tuplas (id_venda, valor_total):")
-    print(tuplas_id_valor[:5])
-    print()
+    fmt.secao("Amostra de tuplas (id_venda, valor_total)")
+    for id_venda, valor_total in tuplas_id_valor[:5]:
+        print(f"  ({id_venda}, {fmt.moeda(valor_total)})")
 
-    print("Registros agrupados por categoria (dict[str, list[dict]]):")
+    fmt.secao("Totais por categoria (dict[str, list[dict]])")
+    larguras_cat = [15, 12, 16]
+    fmt.linha_tabela(["Categoria", "Vendas", "Valor total"], larguras_cat)
     for categoria, itens in por_categoria.items():
         total_categoria = sum(item["valor_total"] for item in itens)
-        print(f"  {categoria}: {len(itens)} vendas, total R$ {total_categoria:.2f}")
-    print()
+        fmt.linha_tabela(
+            [categoria, len(itens), fmt.moeda(total_categoria)], larguras_cat
+        )
 
 
 def agrupar_produtos_por_vendedor(registros):
@@ -254,42 +271,48 @@ def comparar_vendedores(produtos_por_vendedor, vendedor_a, vendedor_b):
 
 def exibir_comparacao(vendedor_a, vendedor_b, resultado):
     """Exibe de forma legível o resultado de comparar_vendedores()."""
-    print(f"Comparando produtos vendidos por {vendedor_a} e {vendedor_b}\n")
-    print(f"União (A | B) — todos os produtos vendidos por algum dos dois:")
-    print(sorted(resultado["uniao"]))
-    print()
-    print(f"Interseção (A & B) — produtos que ambos venderam:")
-    print(sorted(resultado["intersecao"]))
-    print()
-    print(f"Diferença (A - B) — produtos só de {vendedor_a}:")
-    print(sorted(resultado["diferenca_a_b"]))
-    print()
-    print(f"Diferença (B - A) — produtos só de {vendedor_b}:")
-    print(sorted(resultado["diferenca_b_a"]))
-    print()
+    fmt.secao(f"Operações de conjunto: {vendedor_a} × {vendedor_b}")
+    fmt.rotulo("União (A | B)")
+    fmt.lista_valores(sorted(resultado["uniao"]))
+    fmt.rotulo("Interseção (A & B)")
+    fmt.lista_valores(sorted(resultado["intersecao"]))
+    fmt.rotulo(f"Só {vendedor_a} (A - B)")
+    fmt.lista_valores(sorted(resultado["diferenca_a_b"]))
+    fmt.rotulo(f"Só {vendedor_b} (B - A)")
+    fmt.lista_valores(sorted(resultado["diferenca_b_a"]))
 
 
-def exibir_resumo(dados):
-    """Exibe um resumo simples dos conjuntos encontrados."""
+def exibir_resumo(dados, qtd_duplicados, total_final):
+    """Exibe o resumo da leitura e limpeza da base."""
     conjuntos = dados["conjuntos"]
 
-    print(f"Total de registros lidos: {len(dados['registros'])}\n")
+    fmt.secao("Leitura e limpeza da base")
+    fmt.item("Registros lidos", len(dados["registros"]))
+    fmt.item("Duplicados removidos", qtd_duplicados)
+    fmt.item("Total após remoção", total_final, destaque=True)
 
-    for nome, conjunto in conjuntos.items():
-        print(f"{nome} ({len(conjunto)} valores únicos):")
-        print(sorted(conjunto))
-        print()
+    fmt.secao("Valores únicos por coluna (set)")
+    rotulos = {
+        "vendedores": "Vendedores",
+        "produtos": "Produtos",
+        "categorias": "Categorias",
+        "formas_pagamento": "Formas de pagamento",
+    }
+    for chave, rotulo in rotulos.items():
+        conjunto = conjuntos[chave]
+        fmt.rotulo(f"{rotulo} ({len(conjunto)})")
+        fmt.lista_valores(sorted(conjunto))
 
 
 if __name__ == "__main__":
+    fmt.titulo("Análise de Vendas — Tratamento e Modelagem de Dados")
+
     dados = ler_dados_vendas()
 
     registros_sem_duplicados = remover_duplicados(dados["registros"])
     qtd_duplicados = len(dados["registros"]) - len(registros_sem_duplicados)
 
-    exibir_resumo(dados)
-    print(f"Registros duplicados removidos: {qtd_duplicados}")
-    print(f"Total após remoção: {len(registros_sem_duplicados)}\n")
+    exibir_resumo(dados, qtd_duplicados, len(registros_sem_duplicados))
 
     # Operações de conjuntos: comparando produtos entre dois vendedores
     produtos_por_vendedor = agrupar_produtos_por_vendedor(registros_sem_duplicados)
@@ -301,3 +324,5 @@ if __name__ == "__main__":
     tuplas_id_valor = montar_tuplas_id_valor(registros_tratados)
     por_categoria = agrupar_por_categoria(registros_tratados)
     exibir_modelagem(registros_tratados, tuplas_id_valor, por_categoria)
+
+    fmt.rodape("Processamento concluído")
