@@ -88,6 +88,116 @@ def remover_duplicados(registros):
     return registros_unicos
 
 
+def modelar_registros(registros):
+    """
+    Modela os dados brutos (strings) em uma LISTA de DICIONÁRIOS
+    tratados, com os tipos corretos e um campo calculado (valor_total).
+
+    Cada registro tratado é um dicionário no formato:
+        {
+            "id_venda": "V001",
+            "vendedor": "Beatriz",
+            "produto": "Notebook",
+            "categoria": "Informática",
+            "quantidade": 1,          # int
+            "valor_unitario": 3500.0, # float
+            "valor_total": 3500.0,    # float, calculado
+            "data": "2026-06-25",
+            "pagamento": "Pix",
+        }
+
+    Parâmetros:
+        registros (list[dict]): registros brutos (já sem duplicados),
+            como vêm de ler_dados_vendas() / remover_duplicados()
+
+    Retorna:
+        list[dict]: lista de registros tratados (a "coleção" principal)
+    """
+    registros_tratados = []
+
+    for linha in registros:
+        quantidade = int(linha["quantidade"])
+        valor_unitario = float(linha["valor_unitario"])
+        valor_total = quantidade * valor_unitario
+
+        # DICIONÁRIO: objeto estruturado com chaves e valores nomeados
+        registro_tratado = {
+            "id_venda": linha["id_venda"],
+            "vendedor": linha["vendedor"],
+            "produto": linha["produto"],
+            "categoria": linha["categoria"],
+            "quantidade": quantidade,
+            "valor_unitario": valor_unitario,
+            "valor_total": valor_total,
+            "data": linha["data"],
+            "pagamento": linha["pagamento"],
+        }
+
+        # LISTA: guarda a sequência de registros tratados, na ordem
+        registros_tratados.append(registro_tratado)
+
+    return registros_tratados
+
+
+def montar_tuplas_id_valor(registros_tratados):
+    """
+    Cria uma LISTA de TUPLAS (id_venda, valor_total).
+
+    Tupla é usada aqui porque (id_venda, valor_total) é um par que não
+    deve ser alterado depois de criado — é um "retrato" fixo da venda,
+    diferente do dicionário completo, que ainda pode ser atualizado.
+
+    Parâmetros:
+        registros_tratados (list[dict]): saída de modelar_registros()
+
+    Retorna:
+        list[tuple]: [(id_venda, valor_total), ...]
+    """
+    return [
+        (registro["id_venda"], registro["valor_total"])
+        for registro in registros_tratados
+    ]
+
+
+def agrupar_por_categoria(registros_tratados):
+    """
+    Cria uma estrutura ANINHADA: um dicionário onde cada chave é uma
+    categoria e o valor é a LISTA de DICIONÁRIOS (registros) daquela
+    categoria. Ou seja: dict -> list -> dict.
+
+    Parâmetros:
+        registros_tratados (list[dict]): saída de modelar_registros()
+
+    Retorna:
+        dict[str, list[dict]]: {categoria: [registros da categoria]}
+    """
+    por_categoria = {}
+
+    for registro in registros_tratados:
+        categoria = registro["categoria"]
+        por_categoria.setdefault(categoria, []).append(registro)
+
+    return por_categoria
+
+
+def exibir_modelagem(registros_tratados, tuplas_id_valor, por_categoria):
+    """Exibe uma amostra das estruturas montadas, para conferência."""
+    print("Amostra de registros tratados (list[dict]):")
+    for registro in registros_tratados[:3]:
+        print(registro)
+    print()
+
+    print("Amostra de tuplas (id_venda, valor_total):")
+    print(tuplas_id_valor[:5])
+    print()
+
+    print("Registros agrupados por categoria (dict[str, list[dict]]):")
+    for categoria, itens in por_categoria.items():
+        total_categoria = sum(item["valor_total"] for item in itens)
+        print(f"  {categoria}: {len(itens)} vendas, total R$ {total_categoria:.2f}")
+    print()
+
+
 def agrupar_produtos_por_vendedor(registros):
     """
     Monta um dicionário onde cada chave é um vendedor e o valor é o
@@ -185,3 +295,9 @@ if __name__ == "__main__":
     produtos_por_vendedor = agrupar_produtos_por_vendedor(registros_sem_duplicados)
     resultado = comparar_vendedores(produtos_por_vendedor, "Beatriz", "Carlos")
     exibir_comparacao("Beatriz", "Carlos", resultado)
+
+    # Modelagem dos dados com coleções avançadas (list, tuple, dict)
+    registros_tratados = modelar_registros(registros_sem_duplicados)
+    tuplas_id_valor = montar_tuplas_id_valor(registros_tratados)
+    por_categoria = agrupar_por_categoria(registros_tratados)
+    exibir_modelagem(registros_tratados, tuplas_id_valor, por_categoria)
