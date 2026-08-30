@@ -182,6 +182,97 @@ def agrupar_por_categoria(registros_tratados):
     return por_categoria
 
 
+def filtrar_vendas_altas(registros_tratados, limite=1000.0):
+    """
+    LIST COMPREHENSION #1 — Filtragem.
+
+    Seleciona apenas os registros cujo valor_total ultrapassa um
+    limite, sem precisar de um loop explícito com if/append.
+
+    Parâmetros:
+        registros_tratados (list[dict]): saída de modelar_registros()
+        limite (float): valor mínimo (exclusivo) para considerar
+            a venda "de alto valor"
+
+    Retorna:
+        list[dict]: apenas os registros com valor_total > limite
+    """
+    return [venda for venda in registros_tratados if venda["valor_total"] > limite]
+
+
+def gerar_descricoes_vendas(registros_tratados):
+    """
+    LIST COMPREHENSION #2 — Transformação.
+
+    Transforma cada registro (dict) numa string de descrição legível,
+    aplicando .strip().title() no nome do produto para padronizar a
+    capitalização (ex: "notebook" ou "NOTEBOOK" viram "Notebook").
+
+    Parâmetros:
+        registros_tratados (list[dict]): saída de modelar_registros()
+
+    Retorna:
+        list[str]: uma descrição textual por venda
+    """
+    return [
+        f"{venda['produto'].strip().title()} vendido por {venda['vendedor']} "
+        f"em {venda['data']}"
+        for venda in registros_tratados
+    ]
+
+
+def mapear_valor_por_venda(registros_tratados):
+    """
+    DICT COMPREHENSION — Agrupamento/transformação em dicionário.
+
+    Mapeia cada id_venda (chave única) ao seu valor_total. Usei
+    id_venda como chave em vez de vendedor de propósito: como um
+    dicionário não pode ter chaves repetidas, um comprehension como
+    {venda["vendedor"]: venda["valor_total"] for venda in registros}
+    faria cada vendedor repetido SOBRESCREVER o valor anterior,
+    sobrando só o valor da última venda dele. Como id_venda é único
+    por linha, esse problema não acontece aqui.
+
+    Parâmetros:
+        registros_tratados (list[dict]): saída de modelar_registros()
+
+    Retorna:
+        dict[str, float]: {id_venda: valor_total}
+    """
+    return {venda["id_venda"]: venda["valor_total"] for venda in registros_tratados}
+
+
+def exibir_comprehensions(vendas_altas, descricoes, mapa_valor_por_venda, limite):
+    """Exibe o resultado das comprehensions aplicadas."""
+    fmt.secao(f"List Comprehension — Filtragem (valor > {fmt.moeda(limite)})")
+    fmt.item("Vendas encontradas", len(vendas_altas), destaque=True)
+    larguras = [7, 10, 10, 13, 14]
+    fmt.linha_tabela(
+        ["ID", "Vendedor", "Produto", "Categoria", "Valor total"], larguras
+    )
+    for venda in vendas_altas[:5]:
+        fmt.linha_tabela(
+            [
+                venda["id_venda"],
+                venda["vendedor"],
+                venda["produto"],
+                venda["categoria"],
+                fmt.moeda(venda["valor_total"]),
+            ],
+            larguras,
+        )
+    if len(vendas_altas) > 5:
+        print(f"  ... e mais {len(vendas_altas) - 5} venda(s)")
+
+    fmt.secao("List Comprehension — Transformação (descrição textual)")
+    for descricao in descricoes[:5]:
+        print(f"  - {descricao}")
+
+    fmt.secao("Dict Comprehension — id_venda → valor_total")
+    for id_venda, valor in list(mapa_valor_por_venda.items())[:5]:
+        fmt.item(id_venda, fmt.moeda(valor))
+
+
 def exibir_modelagem(registros_tratados, tuplas_id_valor, por_categoria):
     """Exibe uma amostra das estruturas montadas, para conferência."""
     fmt.secao("Amostra de registros tratados (list[dict])")
@@ -324,5 +415,14 @@ if __name__ == "__main__":
     tuplas_id_valor = montar_tuplas_id_valor(registros_tratados)
     por_categoria = agrupar_por_categoria(registros_tratados)
     exibir_modelagem(registros_tratados, tuplas_id_valor, por_categoria)
+
+    # Comprehensions: 2 list comprehensions + 1 dict comprehension
+    limite_valor_alto = 1000.0
+    vendas_altas = filtrar_vendas_altas(registros_tratados, limite_valor_alto)
+    descricoes_vendas = gerar_descricoes_vendas(registros_tratados)
+    mapa_valor_por_venda = mapear_valor_por_venda(registros_tratados)
+    exibir_comprehensions(
+        vendas_altas, descricoes_vendas, mapa_valor_por_venda, limite_valor_alto
+    )
 
     fmt.rodape("Processamento concluído")
